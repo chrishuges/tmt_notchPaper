@@ -130,7 +130,7 @@ names(quanSet) = c(sub(".*?1\\_(.*?)(\\_QuanSpectra\\.txt.*|$)", "\\1", infiles)
 tmtData = data.frame()
 lsetout = data.frame()
 #loop over the files
-for (i in 4:6){
+for (i in 7:9){
 	#decide which columns you want
 	pepCols = c('Annotated.Sequence','First.Scan','Master.Protein.Accessions','X126','X127','X128','X129','X130','X131')
 	pep = as.data.frame(psmSet[[i]])[,pepCols]
@@ -148,7 +148,7 @@ for (i in 4:6){
 	lsetout = rbind(lsetfilt,lsetout)
 }
 #make some colors
-xCol = col2rgb(brewer.pal(9,'Blues')[7])
+xCol = col2rgb(brewer.pal(9,'Purples')[7])
 #make the plot
 pdf('ch_Notch_SpikeDilution_SpikeSignalDistribution_1-30.pdf')
 plot(lsetout$acquisitionNum,
@@ -198,7 +198,7 @@ dev.off()
 tmtData = data.frame()
 lsetout = data.frame()
 #loop over the files
-for (i in 1:6){
+for (i in 1:9){
 	#decide which columns you want
 	pepCols = c('Annotated.Sequence','First.Scan','Master.Protein.Accessions','X126','X127','X128','X129','X130','X131')
 	pep = as.data.frame(psmSet[[i]])[,pepCols]
@@ -212,30 +212,57 @@ for (i in 1:6){
 	#keep only scans that correspond with spike peptides
 	lsetmerge = merge(tmtData,x,by='precursorScanNum')
 	#filter out any that are missing any values
-	lsetfilt = subset(lsetmerge, rowSums(is.na(lsetmerge[,31:36]))<1)
+	lsetfilt = subset(lsetmerge, rowSums(is.na(lsetmerge[,31:33]))<1)
 	lsetout = rbind(lsetfilt,lsetout)
 }
 
 #calculate a total intensity
-lsetout$totInt = rowSums(lsetout[,31:36],na.rm=TRUE)
-lsetout$totSN = rowSums(lsetout[,4:9],na.rm=TRUE)
+lsetout$totInt = rowSums(lsetout[,31:33],na.rm=TRUE)
+lsetout$totSN = rowSums(lsetout[,4:6],na.rm=TRUE)
 #get the rows that are below the notch at log10 2.3
+upup = subset(lsetout, log10(lsetout$x126)>3.0)
 up = subset(lsetout, log10(lsetout$x126)>2.3 & log10(lsetout$x126)<3.0)
 dn = subset(lsetout, log10(lsetout$x126)<2.3 & log10(lsetout$x126)>1.6)
-
-
-
-dn[,31:36] = apply(dn[,31:36],2,function(x) (x/dn$totInt)*24)
-up[,31:36] = apply(up[,31:36],2,function(x) (x/up$totInt)*24)
-dn[,4:9] = apply(dn[,4:9],2,function(x) (x/dn$totSN)*24)
-up[,4:9] = apply(up[,4:9],2,function(x) (x/up$totSN)*24)
-
+#calculate the reporter ion signals
+dn[,31:33] = apply(dn[,31:33],2,function(x) (x/dn$totInt)*9)
+up[,31:33] = apply(up[,31:33],2,function(x) (x/up$totInt)*9)
+upup[,31:33] = apply(upup[,31:33],2,function(x) (x/upup$totInt)*9)
+dn[,4:6] = apply(dn[,4:6],2,function(x) (x/dn$totSN)*9)
+up[,4:6] = apply(up[,4:6],2,function(x) (x/up$totSN)*9)
+upup[,4:6] = apply(upup[,4:6],2,function(x) (x/upup$totSN)*9)
+#sort the data
 dn = dn[order(dn$totInt),]
 up = up[order(up$totInt),]
+upup = upup[order(upup$totInt),]
+
+#get the percent errors
+expRatios = c(3,3,3)
+for (l in 4:6){
+	upup[,l] = abs((upup[,l] - expRatios[l-3])/expRatios[l-3]) * 100
+}
+#get the means
+mean(colMeans(upup[,4:6],na.rm=TRUE))
 
 
 
-
-
-
+#plot the data
+library(beeswarm)
+cols1 = c(rep(brewer.pal(9,'RdBu')[6],3),rep(brewer.pal(9,'RdBu')[4],3))
+#make the plot
+pdf('ch_Notch_SpikeDilution_Boxplot_upRatios.pdf')
+boxplot(up[,4:9],
+		border='black',
+		col = cols1,
+		outline = FALSE,
+		boxlwd = 2,
+		ylim = c(0,8.5),
+		boxwex = 0.5,
+		staplelwd = 2,
+		whisklwd = 2)
+beeswarm(up[,4:9], pch=16,col='grey55',corral="omit",add=TRUE,cex=0.6)
+#add the ratio lines
+abline(h=5,lty=2,lwd=2)
+abline(h=2,lty=2,lwd=2)
+text(1,1,paste('n =',nrow(up)),cex=1.25)
+dev.off()
 
